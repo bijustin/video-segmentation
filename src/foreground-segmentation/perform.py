@@ -3,12 +3,12 @@
 from keras.models import load_model
 
 
-def perform(idx):
+def perform():
     """
     perform the result of the model
     """
     # load the model
-    model = load_model('trained_model/model_{}.h5'.format(idx))
+    model = load_model('trained_model/model.h5')
 
     filename = sys.argv[1]
     cap = cv2.VideoCapture("../../videos/" + filename)
