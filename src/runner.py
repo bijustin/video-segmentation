@@ -5,7 +5,7 @@ import sys
 
 if __name__ == "__main__":
     filename = sys.argv[1]
-    cap = cv2.VideoCapture(filename)
+    cap = cv2.VideoCapture("../videos/" + filename)
 
     ret, frame1 = cap.read()
     prvs = cv2.cvtColor(frame1,cv2.COLOR_BGR2GRAY)
@@ -35,7 +35,6 @@ if __name__ == "__main__":
         hsv[:,:,0] = ang*180/np.pi/2
         hsv[:,:,2] = cv2.normalize(mag,None,0,255,cv2.NORM_MINMAX)
         rgb = cv2.cvtColor(hsv,cv2.COLOR_HSV2BGR)
-
         cv2.imshow('frame2',rgb)
         cv2.waitKey(1)
         prvs = next
