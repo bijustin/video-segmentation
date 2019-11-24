@@ -1,4 +1,5 @@
 numpy
 opencv-python
-keras
 pillow
+torch
+scikit-image

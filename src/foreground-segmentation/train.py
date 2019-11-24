@@ -2,95 +2,76 @@
 
 import glob
 import os
-import numpy as np
-import keras
-from keras.preprocessing import image as kImage
-import sys
-import cv2
-from math import floor
+from torch.utils.data import Dataset, DataLoader
+import torch
+from skimage import io
+from Netmodel import SegNet
 
-from FgSegNet_module import VGG16
+MAX_EPOCHS = 100
+MODEL_PATH = 'training_model/'
+OUTPUT_CHANNEL = 3
 
-BATCH_SIZE = 16
+class Trainingset(Dataset):
 
-
-dataset_paths = {
-    'CDnet2014': 'dataset/dataset2014/dataset',
-}
-
-def getDataList():
-    """
-    Load training dataset
-    """
-    X_list = []
-    y_list = []
-    for _, dataset_path in dataset_paths.items():
-        if not os.path.isdir(dataset_path):
+    def __init__(self, root_path = 'dataset/dataset2014/dataset'):
+        """
+        Get paths of images and their ground truths 
+        """
+        if not os.path.isdir(root_path):
             # download and unzip
             pass
-        X_list.append(sorted(glob.glob(os.path.join(dataset_path, '*', '*', 'input', '*.jpg'))))
-        y_list.append(sorted(glob.glob(os.path.join(dataset_path, '*', '*', 'groundtruth', '*.png'))))
-    X_list = np.array(X_list)
-    y_list = np.array(y_list)
-    idx = list(range(X_list.shape[0]))
-    np.random.shuffle(idx)
-    X_list = X_list[idx]
-    Y_list = y_list[idx]
+        self.img_path = sorted(glob.glob(os.path.join(root_path, '*', '*', 'input', '*jpg')))
+        self.gt_path = sorted(glob.glob(os.path.join(root_path, '*', '*', 'groundtruth', '*.png')))
 
-    return X_list, y_list
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        curr_img_path = self.img_path[idx]
+        curr_gt_path = self.gt_path[idx]
+        img = io.imread(curr_img_path)
+        gt = io.imread(curr_gt_path)
+        sample = {'image': img, 'gt': gt}
+
+        return sample
+
+    def __len__(self):
+        """
+        length of the dataset 
+        """
+        return len(self.img_path)
 
 
-def train(X, Y, model):
-    """ 
-    Train models
-    """
+def getData():
+    # CDnet2014 dataset for now
+    training_set = Trainingset()
+    loader = DataLoader(training_set, batch_size=16, shuffle=True, num_workers=4)
+
+    return loader
+
+def train(loader, clear = True):
+
+    model = None
+
+    if not clear:
+        try:
+            model = torch.load(MODEL_PATH)
+        except:
+            model = SegNet(OUTPUT_CHANNEL)
+    else:
+        model = SegNet(OUTPUT_CHANNEL)
     
-    # stop the training early when validation loss stops improving in 10 epochs
-    early = keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-4, patience=10)
 
-    # reduce the learning rate by a factor of 10 when validation loss stops improving in 5 epochs
-    reduce = keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=5)
+    for epoch in range(MAX_EPOCHS):
+        for img, gt in loader:
+            # train the network
+            pass
 
-    model.fit(X, Y, batch_size=1, epochs=1, verbose=2, validation_split=0.2, callbacks=[reduce, early], shuffle=True)
+    model.save(model.state_dict(), MODEL_PATH)
 
-    
 
 if __name__ == "__main__":
-        X_list, Y_list = getDataList()
-        X_list = np.squeeze(X_list, axis=0)
-        Y_list = np.squeeze(Y_list, axis=0)
-        # ignore the last few images
-        batch_num = floor(X_list.shape[0]/BATCH_SIZE)
+    loader = getData()
+    train(loader)
 
-        # initialize the model
-        model =VGG16()
-
-        for i in range(batch_num):
-            X = []
-            Y = []
-            # one batch of dataset
-            # paths of the images in current batch
-            X_current = X_list[i: i + BATCH_SIZE]
-            Y_current = Y_list[i: i + BATCH_SIZE]
-            
-            for x_path, y_path in zip(list(X_current), list(Y_current)):
-                # load images for current batch
-                x = kImage.load_img(x_path)
-                x = kImage.img_to_array(x)
-                X.append(x)
-
-                # load ground truth label and encode it to label 0/1 (black and white as the final mask)
-                y = kImage.load_img(y_path, grayscale=True)
-                y = kImage.img_to_array(y)
-                y /= 255.0
-                y = np.floor(y)
-                Y.append(y)
-
-            X = np.asarray(X)
-            Y = np.asarray(Y) 
-
-            # train the model based on current batch
-            train(X, Y, model)
-            
-        model.save('trained_model/model.h5')
 

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
-from keras.models import load_model
+import torch
+
+MODEL_PATH = 'training_model/'
 
 
 def perform():
@@ -8,7 +10,7 @@ def perform():
     perform the result of the model
     """
     # load the model
-    model = load_model('trained_model/model.h5')
+    model = torch.load(MODEL_PATH)
 
     filename = sys.argv[1]
     cap = cv2.VideoCapture("../../videos/" + filename)
@@ -23,11 +25,12 @@ def perform():
         if not ret:
             break
         frame = np.array([frame])
-        pred = model.predict(frame, verbose=1, batch_size=1)
-        pred = np.squeeze(pred, axis = 0)
+        # pred = model.predict(frame, verbose=1, batch_size=1)
+        # pred = np.squeeze(pred, axis = 0)
+        # predict based on the trained neural network
         cv2.imshow('frame2',pred)
         cv2.waitKey(1)
 
 
 if __name__ == "__main__":
-        perform(0)
+        perform()
