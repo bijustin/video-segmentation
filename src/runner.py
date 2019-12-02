@@ -12,6 +12,19 @@ from baseline_mode import Baseline
 from uNLC.src.nlc import nlc_videos
 
 
+#################################################################################
+#################################################################################
+# TODO: set RUN_NLC to false if you don't want to run NLC algorithm
+# TODO: set LOAD_NLC to false if you don't want to load the NLC output
+
+RUN_NLC = True
+
+LOAD_NLC = True
+
+#################################################################################
+#################################################################################
+
+
 def threshold(mask):
     blur = cv2.GaussianBlur(mask,(5,5),0)
     ret,th = cv2.threshold(blur,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
@@ -68,16 +81,17 @@ if __name__ == "__main__":
     # initialize the baseline_mode method
     BLM = Baseline(prvs)
 
-    #############################################################################################
-    # Pre-run nlc algorithm
-    # Might need to run :
-    #       sudo su
-    #       echo 1 > /proc/sys/vm/overcommit_memory 
-    # otherwise computer might not be able to collect enough memory for numpy array in compute_nn
-    nlc_videos(filename, load=False)
-    frame_idx = 0
+    if RUN_NLC:
+        #############################################################################################
+        # Pre-run nlc algorithm
+        # Might need to run :
+        #       sudo su
+        #       echo 1 > /proc/sys/vm/overcommit_memory 
+        # otherwise computer might not be able to collect enough memory for numpy array in compute_nn
+        nlc_videos(filename, load=False)
+        frame_idx = 0
 
-    #############################################################################################
+        #############################################################################################
     
     while True:
         # current frame idx
@@ -103,9 +117,10 @@ if __name__ == "__main__":
         bl = BLM.step(next)
         masks.append(threshold(bl))
 
-        # output from nlc algorithm, finished thresholding already
-        nlc = nlc_videos(filename, frame_idx, load=True)
-        masks.append(nlc)
+        if LOAD_NLC:
+            # output from nlc algorithm, finished thresholding already
+            nlc = nlc_videos(filename, frame_idx, load=True)
+            masks.append(nlc)
 
         final = getConsensus(masks)
         print(final)
@@ -122,7 +137,10 @@ if __name__ == "__main__":
         cv2.imshow("mbd", threshold(mbd))
         cv2.imshow("pSMR", pSMR)
         cv2.imshow("bl", bl)
-        cv2.imshow("nlc", nlc)
+
+        if LOAD_NLC:
+            cv2.imshow("nlc", nlc)
+
         #cv2.imshow("MR", sal)
         cv2.imshow("ang", ang)
         cv2.imshow("mag", mag)
