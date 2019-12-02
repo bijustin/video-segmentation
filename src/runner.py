@@ -9,6 +9,7 @@ from saliency import get_saliency_ft, get_saliency_rbd
 from saliency_mbd import get_saliency_mbd   
 from skimage.measure import label  
 from baseline_mode import Baseline
+from uNLC.src.nlc import nlc_videos
 
 
 def threshold(mask):
@@ -67,7 +68,21 @@ if __name__ == "__main__":
     # initialize the baseline_mode method
     BLM = Baseline(prvs)
 
+    #############################################################################################
+    # Pre-run nlc algorithm
+    # Might need to run :
+    #       sudo su
+    #       echo 1 > /proc/sys/vm/overcommit_memory 
+    # otherwise computer might not be able to collect enough memory for numpy array in compute_nn
+    nlc_videos(filename, load=False)
+    frame_idx = 0
+
+    #############################################################################################
+    
     while True:
+        # current frame idx
+        frame_idx += 1
+
         ret, frame = cap.read()
         if not ret:
             break
@@ -88,18 +103,26 @@ if __name__ == "__main__":
         bl = BLM.step(next)
         masks.append(threshold(bl))
 
+        # output from nlc algorithm, finished thresholding already
+        nlc = nlc_videos(filename, frame_idx, load=True)
+        masks.append(nlc)
+
         final = getConsensus(masks)
         print(final)
         drawimg = next.copy()
         mask = np.zeros_like(drawimg)
         mask[:,:,0] = final.astype(np.float)*255
         drawimg = cv2.add(drawimg, mask)
+
+
+        # show masked frames
         cv2.imshow("mask", final.astype(np.float))
         cv2.imshow("rbd", threshold(rbd))
         cv2.imshow("img", drawimg)
         cv2.imshow("mbd", threshold(mbd))
         cv2.imshow("pSMR", pSMR)
         cv2.imshow("bl", bl)
+        cv2.imshow("nlc", nlc)
         #cv2.imshow("MR", sal)
         cv2.imshow("ang", ang)
         cv2.imshow("mag", mag)

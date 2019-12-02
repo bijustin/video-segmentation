@@ -21,11 +21,24 @@ from scipy import ndimage
 # from cv2 import calcOpticalFlowFarneback, OPTFLOW_FARNEBACK_GAUSSIAN
 from scipy.signal import convolve2d
 import time
-import utils
-import _init_paths  # noqa
+import uNLC.src.utils as utils
+import uNLC.src._init_paths as _init_paths  # noqa
 from mr_saliency import MR
 import pyflow
 import cv2
+
+
+VIDDIR = '/home/neo/video-segmentation/videos/'
+
+MASKDIR = '{}'
+
+FRAMEGAP = 0    # Gap between frames while running tracker. Default 0.
+
+MAXSP = 1000    # Max # of superpixels per image. Default 0.
+
+ITERS = 100     # # of iterations of consensus voting. Default 100.
+
+RAMDOM_SEED = 2905  # Random seed for numpy and python.
 
 
 def imresize(old_image, frac):
@@ -535,8 +548,8 @@ def nlc(imSeq, maxsp, iters, outdir=None, suffix='',
     """
     if dosave is None:
         dosave = not doload
-    import sys
-    sys.setrecursionlimit(100000)
+    # import sys
+    # sys.setrecursionlimit(100000)
 
     if not doload:
         # compute Superpixels -- 2.5s per 720x1280 image for any maxsp
@@ -593,68 +606,42 @@ def nlc(imSeq, maxsp, iters, outdir=None, suffix='',
     return maskSeq
 
 
-def parse_args():
-    """
-    Parse input arguments
-    """
-    import argparse
-    parser = argparse.ArgumentParser(
-        description='Foreground Segmentation using Non-Local Consensus')
-    parser.add_argument(
-        '-out', dest='outdir',
-        help='Directory to save output.',
-        default=os.getenv("HOME") + '/local/data/trash/', type=str)
-    parser.add_argument(
-        '-imdir', dest='imdir',
-        help='Directory containing video images. Will be read ' +
-        'alphabetically. Default is random Imagenet train video.',
-        default='', type=str)
-    parser.add_argument(
-        '-fgap', dest='frameGap',
-        help='Gap between frames while running tracker. Default 0.',
-        default=0, type=int)
-    parser.add_argument(
-        '-maxsp', dest='maxsp',
-        help='Max # of superpixels per image. Default 0.',
-        default=1000, type=int)
-    parser.add_argument(
-        '-iters', dest='iters',
-        help='# of iterations of consensus voting. Default 100.',
-        default=100, type=int)
-    parser.add_argument(
-        '-seed', dest='seed',
-        help='Random seed for numpy and python.', default=2905, type=int)
-
-    args = parser.parse_args()
-    return args
-
-
-def demo_videos():
+def nlc_videos(filename, frame_idx=0, load=False):
     """
     Input is the path of directory containing raw videos
     """
-    # Hard coded parameters
-    maxSide = 600  # max length of longer side of Im
-    lenSeq = 35  # longer seq will be shrinked between [lenSeq/2, lenSeq]
-    binTh = 0.4  # final thresholding to obtain mask
-    clearFinalBlobs = True  # remove low energy blobs; uses binTh
-    vidDir = '/home/neo/video-segmentation/videos/'
+    if frame_idx == 0 or not load:
 
-    # parse commandline parameters
-    args = parse_args()
-    np.random.seed(args.seed)
-    print('InputDir: ', vidDir)
-    # print('OutputDir: ', args.outdir)
+        # Hard coded parameters
+        maxSide = 600  # max length of longer side of Im
 
-    vidPathList = utils.read_r(vidDir, '*.mp4')
-    # for i in range(len(vidPathList)):
-    for i in range(1):
-        print('\nCurrent VideoPath: ', vidPathList[i])
+
+        #############################################################################################################
+        #############################################################################################################
+        # Might need to run :
+        #       sudo su
+        #       echo 1 > /proc/sys/vm/overcommit_memory 
+        # otherwise computer might not be able to collect enough memory for numpy array in compute_nn
+        
+        lenSeq = 100  # longer seq will be shrinked between [lenSeq/2, lenSeq]
+
+        #############################################################################################################
+        #############################################################################################################
+
+        binTh = 0.4  # final thresholding to obtain mask
+        clearFinalBlobs = True  # remove low energy blobs; uses binTh
+        vidDir = VIDDIR
+
+        np.random.seed(RAMDOM_SEED)
+        print('Inputvideo: ', vidDir + filename)
+
+        vidPath =  vidDir + filename
+
         # load video
-        imSeq = utils.vid2im(vidPathList[i])
+        imSeq = utils.vid2im(vidPath)
         n, h, w, c = imSeq.shape
         # adjust frameGap
-        frameGap = args.frameGap
+        frameGap = FRAMEGAP
         if frameGap <= 0 and n > lenSeq:
             frameGap = int(n / lenSeq)
         imSeq = imSeq[::frameGap + 1]
@@ -669,9 +656,7 @@ def demo_videos():
             imSeq = imSeq2
         print('Total Video Shape: ', imSeq.shape)
         if imSeq.shape[1] < 2:
-            print('Not enough images in this video')
-            print('Continuing to next one ...')
-            continue
+            raise RuntimeError("Not enough images in this video")
 
         # setup output directory
         # suffix = vidPathList[i].split('/')[-1]
@@ -681,17 +666,14 @@ def demo_videos():
         # utils.mkdir_p(outdirV)
         # print('OutputDir for current Video: ', outdirV)
 
-        # run the algorithm
-        maskSeq = None
-        first = False
-        if first:
-            maskSeq = nlc(imSeq, maxsp=args.maxsp, iters=args.iters)
-            np.save('/home/neo/video-segmentation/src/uNLC/maskSeq/tmp.npy', maskSeq)
-        else:
-            maskSeq = np.load('/home/neo/video-segmentation/src/uNLC/maskSeq/tmp.npy')
+        # run the algorithm    
+        
+        maskSeq = nlc(imSeq, maxsp=MAXSP, iters=ITERS)
+
         # save visual results
         if clearFinalBlobs:
             maskSeq = remove_low_energy_blobs(maskSeq, binTh)
+        
         for i in range(maskSeq.shape[0]):
             mask = (maskSeq[i] > binTh).astype(np.uint8)
             grayscaleimage = (color.rgb2gray(imSeq[i]) * 255.).astype(np.uint8)
@@ -700,11 +682,15 @@ def demo_videos():
                 imMasked[:, :, c] = grayscaleimage / 2 + 127
             imMasked[mask.astype(np.bool), 1:] = 0
             _, imMasked = cv2.threshold(imMasked, 127, 255, cv2.THRESH_BINARY)
-            # display the mask sequences
-            cv2.imshow('frame', imMasked)
-            # cv2.imshow('frame', maskSeq[i])
-            cv2.waitKey(100)
-    return
+
+            # save numpy array 
+            np.save('{}{}{}.npy'.format(MASKDIR, filename, i), imMasked)
+        
+        return np.load('{}{}{}.npy'.format(MASKDIR, filename, 0))
+
+    else:
+        return np.load('{}{}{}.npy'.format(MASKDIR, filename, frame_idx))
+
 
 if __name__ == "__main__":
-    demo_videos()
+    nlc_videos("bus.mp4", frame_idx = 0)
