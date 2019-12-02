@@ -20,7 +20,7 @@ args = parser.parse_args()
 im1 = np.array(Image.open('examples/car1.jpg'))
 im2 = np.array(Image.open('examples/car2.jpg'))
 im1 = im1.astype(float) / 255.
-im2 = im2.astype(float) / 255.  
+im2 = im2.astype(float) / 255.
 
 # Flow Options:
 alpha = 0.012

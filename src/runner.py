@@ -8,6 +8,8 @@ from flow import getFlow
 from saliency import get_saliency_ft, get_saliency_rbd
 from saliency_mbd import get_saliency_mbd   
 from skimage.measure import label  
+from baseline_mode import Baseline
+
 
 def threshold(mask):
     blur = cv2.GaussianBlur(mask,(5,5),0)
@@ -62,6 +64,9 @@ if __name__ == "__main__":
     ret, frame1 = cap.read()
     prvs = cv2.resize(frame1, (420,240))
 
+    # initialize the baseline_mode method
+    BLM = Baseline(prvs)
+
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -78,6 +83,11 @@ if __name__ == "__main__":
         masks.append(threshold(rbd))
         mbd = get_saliency_mbd(next).astype('uint8')
         masks.append(threshold(mbd))
+
+        # output from baseline_mode 
+        bl = BLM.step(next)
+        masks.append(threshold(bl))
+
         final = getConsensus(masks)
         print(final)
         drawimg = next.copy()
@@ -89,6 +99,7 @@ if __name__ == "__main__":
         cv2.imshow("img", drawimg)
         cv2.imshow("mbd", threshold(mbd))
         cv2.imshow("pSMR", pSMR)
+        cv2.imshow("bl", bl)
         #cv2.imshow("MR", sal)
         cv2.imshow("ang", ang)
         cv2.imshow("mag", mag)
