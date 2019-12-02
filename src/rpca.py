@@ -69,7 +69,7 @@ class R_pca:
 
 
 def get_binary_map(frame, max_iter=1000, debug=False):
-    rpca = R_pca(cv2.cvtColor(next, cv2.COLOR_RGB2GRAY))
+    rpca = R_pca(cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY))
     L, S = rpca.fit(max_iter=max_iter, iter_print=100, debug=debug)
     S = cv2.normalize(S, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F).astype(np.uint8)
     _,S = cv2.threshold(S,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
