@@ -1,5 +1,19 @@
 numpy
 opencv-python
 pillow
-torch
-scikit-image
+ipdb
+
+# conda update -n base conda
+# 
+# conda config --set show_channel_urls True
+# 
+# conda create --name [environment-name] --override-channels \
+#   -c https://www.idiap.ch/software/bob/conda -c defaults \
+#   python=3 bob
+# 
+# conda config --env --add channels defaults
+# 
+# conda config --env --add channels https://www.idiap.ch/software/bob/conda
+# 
+# conda install -c conda-forge/label/broken bob.ip.optflow.liu
+
