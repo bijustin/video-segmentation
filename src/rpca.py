@@ -40,7 +40,7 @@ class R_pca:
         U, S, V = np.linalg.svd(M, full_matrices=False)
         return np.dot(U, np.dot(np.diag(self.shrink(S, tau)), V))
 
-    def fit(self, tol=None, max_iter=1000, iter_print=100):
+    def fit(self, tol=None, max_iter=1000, iter_print=100, debug=False):
         iter = 0
         err = np.Inf
         Sk = self.S
@@ -60,9 +60,17 @@ class R_pca:
             Yk = Yk + self.mu * (self.D - Lk - Sk)
             err = self.frobenius_norm(self.D - Lk - Sk)
             iter += 1
-            if (iter % iter_print) == 0 or iter == 1 or iter > max_iter or err <= _tol:
+            if debug and ((iter % iter_print) == 0 or iter == 1 or iter > max_iter or err <= _tol):
                 print('iteration: {0}, error: {1}'.format(iter, err))
 
         self.L = Lk
         self.S = Sk
         return Lk, Sk
+
+
+def get_binary_map(frame, max_iter=1000, debug=False):
+    rpca = R_pca(cv2.cvtColor(next, cv2.COLOR_RGB2GRAY))
+    L, S = rpca.fit(max_iter=max_iter, iter_print=100, debug=debug)
+    S = cv2.normalize(S, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F).astype(np.uint8)
+    _,S = cv2.threshold(S,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+    return S
