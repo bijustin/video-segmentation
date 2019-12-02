@@ -2,6 +2,7 @@ numpy
 opencv-python
 pillow
 ipdb
+Cython
 
 # conda update -n base conda
 # 
