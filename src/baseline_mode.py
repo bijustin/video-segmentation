@@ -12,12 +12,11 @@ import numpy as np
 
 class Baseline():
 
-    def __init__(self, filename, Th=10, Fth=1):
-        self.cap = cv2.VideoCapture("../videos/" + filename)
+    def __init__(self, frame1, Th=3, Fth=1):
         self.Th = Th
         self.Fth = Fth
 
-        ret, self.previous_I = self.cap.read()
+        self.previous_I = frame1
         self.previous_I = cv2.cvtColor(self.previous_I, cv2.COLOR_BGR2GRAY)
         self.x = np.size(self.previous_I, axis=0)
         self.y = np.size(self.previous_I, axis=1)
@@ -100,29 +99,25 @@ class Baseline():
         self.previous_BDM = self.current_BDM
         self.previous_IOM = self.current_IOM
 
-    def propagate(self):
-        while True:
-            ret, self.current_I = self.cap.read()
-            self.current_I = cv2.cvtColor(self.current_I, cv2.COLOR_BGR2GRAY)
-            if not ret:
-                break
+    def step(self, frame2):
+        self.current_I = frame2
+        self.current_I = cv2.cvtColor(self.current_I, cv2.COLOR_BGR2GRAY)
 
-            self.__frameDifference()
-            self.__backgroundRegistration()
-            self.__backgroundDifferenceMask()
-            self.__objectDetection()
-            self.__postProcessing()
-            self.__updateParam()
+        self.__frameDifference()
+        self.__backgroundRegistration()
+        self.__backgroundDifferenceMask()
+        self.__objectDetection()
+        self.__postProcessing()
+        self.__updateParam()
 
-            self.current_IOM *= 255
-            self.current_IOM = self.current_IOM.astype(np.uint8)
-            print(self.current_IOM)
-            
-            cv2.imshow('frame2', self.current_IOM)
-            cv2.waitKey(1)
+        self.current_IOM *= 255
+        self.current_IOM = self.current_IOM.astype(np.uint8)
+        print(self.current_IOM)
+        
+        return self.current_IOM
 
 
 
-if __name__ == "__main__":
-    model = Baseline("bus.mp4")  
-    model.propagate()     
+# if __name__ == "__main__":
+#     model = Baseline("bus.mp4")  
+#     model.propagate()     
