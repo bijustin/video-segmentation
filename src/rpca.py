@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 
 # Code modified from: https://github.com/dganguli/robust-pca
 # Example of use:
@@ -6,8 +7,8 @@ import numpy as np
 # rpca = R_pca(img_frames)
 # L, S = rpca.fit(max_iter=10000, iter_print=100)
 
-# L should represent the background while S should represent the foreground
-# Threshold the L, S matrices to obtain a binary representation
+
+import numpy as np
 
 class R_pca:
 
@@ -19,7 +20,7 @@ class R_pca:
         if mu:
             self.mu = mu
         else:
-            self.mu = np.prod(self.D.shape) / (4 * self.frobenius_norm(self.D))
+            self.mu = np.prod(self.D.shape) / (4 * self.norm_p(self.D, 2))
 
         self.mu_inv = 1 / self.mu
 
@@ -29,8 +30,8 @@ class R_pca:
             self.lmbda = 1 / np.sqrt(np.max(self.D.shape))
 
     @staticmethod
-    def frobenius_norm(M):
-        return np.linalg.norm(M, ord='fro')
+    def norm_p(M, p):
+        return np.sum(np.power(M, p))
 
     @staticmethod
     def shrink(M, tau):
@@ -50,7 +51,7 @@ class R_pca:
         if tol:
             _tol = tol
         else:
-            _tol = 1E-7 * self.frobenius_norm(self.D)
+            _tol = 1E-7 * self.norm_p(np.abs(self.D), 2)
 
         while (err > _tol) and iter < max_iter:
             Lk = self.svd_threshold(
@@ -58,7 +59,7 @@ class R_pca:
             Sk = self.shrink(
                 self.D - Lk + (self.mu_inv * Yk), self.mu_inv * self.lmbda)
             Yk = Yk + self.mu * (self.D - Lk - Sk)
-            err = self.frobenius_norm(self.D - Lk - Sk)
+            err = self.norm_p(np.abs(self.D - Lk - Sk), 2)
             iter += 1
             if debug and ((iter % iter_print) == 0 or iter == 1 or iter > max_iter or err <= _tol):
                 print('iteration: {0}, error: {1}'.format(iter, err))
@@ -67,10 +68,19 @@ class R_pca:
         self.S = Sk
         return Lk, Sk
 
+def get_binary_map(current_frame, prev_frame=None, max_iter=1000, debug=False):
+    current_frame = cv2.cvtColor(current_frame, cv2.COLOR_RGB2GRAY)
+    if prev is not None:
+        prev_frame = cv2.cvtColor(prev_frame, cv2.COLOR_RGB2GRAY)
+        frames = np.stack((prev_frame, current_frame), axis=2)
+    else:
+        frames = np.expand_dims(current_frame,axis=2)
+    frame_shape = frames.shape
 
-def get_binary_map(frame, max_iter=1000, debug=False):
-    rpca = R_pca(cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY))
+    frames = frames.reshape(-1, frame_shape[2])
+    rpca = R_pca(frames)
     L, S = rpca.fit(max_iter=max_iter, iter_print=100, debug=debug)
-    S = cv2.normalize(S, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F).astype(np.uint8)
+    S = S.reshape(frame_shape)
+    S = cv2.normalize(S[:,:,0], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F).astype(np.uint8)
     _,S = cv2.threshold(S,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
     return S
