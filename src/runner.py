@@ -17,7 +17,7 @@ from uNLC.src.nlc import nlc_videos
 # TODO: set RUN_NLC to false if you don't want to run NLC algorithm
 # TODO: set LOAD_NLC to false if you don't want to load the NLC output
 
-RUN_NLC = True
+RUN_NLC = False
 
 LOAD_NLC = True
 
@@ -81,6 +81,8 @@ if __name__ == "__main__":
     # initialize the baseline_mode method
     BLM = Baseline(prvs)
 
+    frame_idx = 0
+
     if RUN_NLC:
         #############################################################################################
         # Pre-run nlc algorithm
@@ -89,7 +91,6 @@ if __name__ == "__main__":
         #       echo 1 > /proc/sys/vm/overcommit_memory 
         # otherwise computer might not be able to collect enough memory for numpy array in compute_nn
         nlc_videos(filename, load=False)
-        frame_idx = 0
 
         #############################################################################################
     

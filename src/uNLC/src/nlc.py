@@ -21,8 +21,18 @@ from scipy import ndimage
 # from cv2 import calcOpticalFlowFarneback, OPTFLOW_FARNEBACK_GAUSSIAN
 from scipy.signal import convolve2d
 import time
-import uNLC.src.utils as utils
-import uNLC.src._init_paths as _init_paths  # noqa
+import math
+
+try:
+    import uNLC.src.utils as utils
+except ModuleNotFoundError:
+    import utils 
+
+try:
+    import uNLC.src._init_paths as _init_paths  # noqa
+except:
+    import _init_paths
+
 from mr_saliency import MR
 import pyflow
 import cv2
@@ -30,7 +40,7 @@ import cv2
 
 VIDDIR = '/home/neo/video-segmentation/videos/'
 
-MASKDIR = '{}'
+MASKDIR = '/home/neo/video-segmentation/src/uNLC/maskSeq/'
 
 FRAMEGAP = 0    # Gap between frames while running tracker. Default 0.
 
@@ -40,6 +50,7 @@ ITERS = 100     # # of iterations of consensus voting. Default 100.
 
 RAMDOM_SEED = 2905  # Random seed for numpy and python.
 
+BATCH_FRAME = 20 # Number of frames in a batch
 
 def imresize(old_image, frac):
     im = Image.fromarray(old_image)
@@ -610,8 +621,7 @@ def nlc_videos(filename, frame_idx=0, load=False):
     """
     Input is the path of directory containing raw videos
     """
-    if frame_idx == 0 or not load:
-
+    if not load:
         # Hard coded parameters
         maxSide = 600  # max length of longer side of Im
 
@@ -639,58 +649,75 @@ def nlc_videos(filename, frame_idx=0, load=False):
 
         # load video
         imSeq = utils.vid2im(vidPath)
+
         n, h, w, c = imSeq.shape
-        # adjust frameGap
-        frameGap = FRAMEGAP
-        if frameGap <= 0 and n > lenSeq:
-            frameGap = int(n / lenSeq)
-        imSeq = imSeq[::frameGap + 1]
-        n = imSeq.shape[0]
-        # adjust size
-        frac = min(min(1. * maxSide / h, 1. * maxSide / w), 1.0)
-        if frac < 1.0:
-            h, w, c = imresize(imSeq[0], frac).shape
-            imSeq2 = np.zeros((n, h, w, c), dtype=np.uint8)
-            for j in range(n):
-                imSeq2[j] = imresize(imSeq[j], frac)
-            imSeq = imSeq2
-        print('Total Video Shape: ', imSeq.shape)
-        if imSeq.shape[1] < 2:
-            raise RuntimeError("Not enough images in this video")
 
-        # setup output directory
-        # suffix = vidPathList[i].split('/')[-1]
-        # suffix = vidPathList[i].split('/')[-2] if suffix == '' else suffix
-        # suffix = suffix[:-4]
-        # outdirV = args.outdir + '/' + suffix
-        # utils.mkdir_p(outdirV)
-        # print('OutputDir for current Video: ', outdirV)
+        batch_num = math.ceil(n/BATCH_FRAME)
 
-        # run the algorithm    
-        
-        maskSeq = nlc(imSeq, maxsp=MAXSP, iters=ITERS)
+        batches = np.array_split(imSeq, batch_num)
 
-        # save visual results
-        if clearFinalBlobs:
-            maskSeq = remove_low_energy_blobs(maskSeq, binTh)
-        
-        for i in range(maskSeq.shape[0]):
-            mask = (maskSeq[i] > binTh).astype(np.uint8)
-            grayscaleimage = (color.rgb2gray(imSeq[i]) * 255.).astype(np.uint8)
-            imMasked = np.zeros(imSeq[i].shape, dtype=np.uint8)
-            for c in range(3):
-                imMasked[:, :, c] = grayscaleimage / 2 + 127
-            imMasked[mask.astype(np.bool), 1:] = 0
-            _, imMasked = cv2.threshold(imMasked, 127, 255, cv2.THRESH_BINARY)
+        idx = 0
 
-            # save numpy array 
-            np.save('{}{}{}.npy'.format(MASKDIR, filename, i), imMasked)
-        
-        return np.load('{}{}{}.npy'.format(MASKDIR, filename, 0))
+        for batch_imSeq in batches:
+            n = batch_imSeq.shape[0]
+            
+            # adjust frameGap
+            # frameGap = FRAMEGAP
+            # if frameGap <= 0 and n > lenSeq:
+            #     frameGap = int(n / lenSeq)
+
+            # imSeq = imSeq[::frameGap + 1]
+            imSeq = batch_imSeq
+            n = imSeq.shape[0]
+            # adjust size
+            frac = min(min(1. * maxSide / h, 1. * maxSide / w), 1.0)
+            if frac < 1.0:
+                h, w, c = imresize(imSeq[0], frac).shape
+                imSeq2 = np.zeros((n, h, w, c), dtype=np.uint8)
+                for j in range(n):
+                    imSeq2[j] = imresize(imSeq[j], frac)
+                imSeq = imSeq2
+            print('Total Video Shape: ', imSeq.shape)
+            if imSeq.shape[1] < 2:
+                raise RuntimeError("Not enough images in this video")
+
+            # setup output directory
+            # suffix = vidPathList[i].split('/')[-1]
+            # suffix = vidPathList[i].split('/')[-2] if suffix == '' else suffix
+            # suffix = suffix[:-4]
+            # outdirV = args.outdir + '/' + suffix
+            # utils.mkdir_p(outdirV)
+            # print('OutputDir for current Video: ', outdirV)
+
+            # run the algorithm    
+            
+            maskSeq = nlc(imSeq, maxsp=MAXSP, iters=ITERS)
+
+            # save visual results
+            if clearFinalBlobs:
+                maskSeq = remove_low_energy_blobs(maskSeq, binTh)
+            
+            for i in range(maskSeq.shape[0]):
+                mask = (maskSeq[i] > binTh).astype(np.uint8)
+                grayscaleimage = (color.rgb2gray(imSeq[i]) * 255.).astype(np.uint8)
+                imMasked = np.zeros(imSeq[i].shape, dtype=np.uint8)
+                for c in range(3):
+                    imMasked[:, :, c] = grayscaleimage / 2 + 127
+                imMasked[mask.astype(np.bool), 1:] = 0
+                _, imMasked = cv2.threshold(imMasked, 127, 255, cv2.THRESH_BINARY)
+
+                # gray-scaled imMasked
+                gray_imMasked = utils.rgb2gray(imMasked)
+
+                # save numpy array 
+                np.save('{}{}{}.npy'.format(MASKDIR, filename, idx), gray_imMasked)
+                idx += 1
+            
+        return utils.invert(np.load('{}{}{}.npy'.format(MASKDIR, filename, 0)))
 
     else:
-        return np.load('{}{}{}.npy'.format(MASKDIR, filename, frame_idx))
+        return utils.invert(np.load('{}{}{}.npy'.format(MASKDIR, filename, frame_idx)))
 
 
 if __name__ == "__main__":
-    nlc_videos("bus.mp4", frame_idx = 0)
+    nlc = nlc_videos("bus.mp4", frame_idx = 0, load=False)

@@ -29,6 +29,8 @@ def vid2im(vidPath):
     while notdone:
         notdone, frame = vidcap.read()
         if notdone:
+            # consistent with runner
+            frame = cv2.resize(frame, (420,240))
             imSeq.append(frame[np.newaxis, :, :, :])
     imSeq = np.concatenate(imSeq)
     imSeq = imSeq[..., ::-1]
@@ -202,3 +204,13 @@ def my_accumarray(indices, vals, size, func='plus', fill_value=0):
     # fill things that were not used with fill value
     output[np.invert(isthere)] = fill_value
     return output
+
+
+def rgb2gray(rgb):
+    return np.dot(rgb[...,:3], [0.2989, 0.5870, 0.1140])
+
+
+def invert(frame2D):
+    x, y = frame2D.shape
+    mask = np.full((x, y), 255)
+    return np.subtract(mask, frame2D)
