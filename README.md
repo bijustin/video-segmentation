@@ -1,37 +1,133 @@
-## Welcome to GitHub Pages
+# Video Segmentation
 
-You can use the [editor on GitHub](https://github.com/bijustin/video-segmentation/edit/master/README.md) to maintain and preview the content for your website in Markdown files.
+[Project Website Link](https://sites.google.com/umich.edu/video-segmentation/home)
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+## Setup
 
-### Markdown
+The development environment we use is Ubuntu Linux 18.04
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
+The python environment we use is Anaconda. [Link to Anaconda installation](https://docs.anaconda.com/anaconda/install/), remember to set `conda` command globally in bashrc.
 
-```markdown
-Syntax highlighted code block
+First download the whole repo:
 
-# Header 1
-## Header 2
-### Header 3
-
-- Bulleted
-- List
-
-1. Numbered
-2. List
-
-**Bold** and _Italic_ and `Code` text
-
-[Link](url) and ![Image](src)
+```
+git clone git@github.com:bijustin/video-segmentation.git
 ```
 
-For more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).
+Create and activate Anaconda environment:
 
-### Jekyll Themes
+```
+conda create -n video-segmentation python=3.7
+conda activate video-segmentation
+```
 
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/bijustin/video-segmentation/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
+Install the required python package:
 
-### Support or Contact
+```
+cd video-segmentation/src
+pip install -r requirements.txt
+```
 
-Having trouble with Pages? Check out our [documentation](https://help.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we’ll help you sort it out.
+### Setup for packages required for NLC algorithm
+
+Our NLC algorithm is adapted from [video-seg](https://github.com/pathak22/videoseg). So our setup steps are similar to them.
+
+Here is our setup:
+
+- Install optical flow
+
+```
+cd video-segmentation/src/uNLC/lib/
+git clone https://github.com/pathak22/pyflow.git
+cd pyflow/
+python setup.py build_ext -i
+python demo.py    # -viz option to visualize output
+```
+
+- Install Dense CRF code
+
+```
+cd video-segmentation/src/uNLC/lib/
+git clone https://github.com/lucasb-eyer/pydensecrf.git
+cd pydensecrf/
+python setup.py build_ext -i
+```
+
+- Install appearance saliency
+
+```
+cd video-segmentation/src/uNLC/lib/
+git clone https://github.com/ruanxiang/mr_saliency.git
+```
+
+- Install kernel temporal segmentation code
+
+```
+# cd video-segmentation/src/uNLC/lib/
+# wget http://pascal.inrialpes.fr/data2/potapov/med_summaries/kts_ver1.1.tar.gz
+# tar -zxvf kts_ver1.1.tar.gz && mv kts_ver1.1 kts
+# rm -f kts_ver1.1.tar.gz
+
+# Edit kts/cpd_nonlin.py to remove weave dependecy. Due to this change, we are shipping the library.
+# Included invideo-segmentation/src/uNLC/lib/kts/ . However, it is not a required change if you already have weave installed
+# (which is mostly present by default).
+```
+
+- Convert them to modules
+
+```
+cd video-segmentation/src/uNLC/lib/
+cp __init__.py mr_saliency/
+cp __init__.py kts/
+```
+
+## Run the program
+
+After the setups, we could run the main program `runner.py`
+
+By running
+
+```
+cd video-segmentation/src/
+python runner.py -h
+```
+You can see what flags we have and their usages by running:
+
+
+You should put all the video files under directory `video-segmentation/videos/`
+
+Here are examples of how to run the `runner.py`
+
+### Run without NLC
+
+You can run the all of the algorithms (not including NLC) by:
+```
+python runner.py --filename [Your video name, e.g. bus.mp4]
+```
+You do not need to prerun NLC in this case
+
+
+### Prerun NLC algorithm
+
+You can prerun NLC algorithm by
+
+```
+python runner.py --filename [Your video name, e.g. bus.mp4] --prerunNLC True
+```
+
+and the numpy array will be saved under `video-segmentation/src/uNLC/maskSeq`
+
+You can also change the batch size of the NLC algorithm by running
+
+```
+python runner.py --filename [Your video name, e.g. bus.mp4] --prerunNLC True --NLCbatch [Batch size you want (should be an integer)]
+```
+
+
+### Run the algorithm with NLC
+
+This can only happen after you have prerun NLC algorithm first. After that, you can run the algorithm with NLC by
+
+```
+python runner.py --filename [Your video name, e.g. bus.mp4] --prerunNLC True --NLCon True
+```

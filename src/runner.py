@@ -10,19 +10,7 @@ from saliency_mbd import get_saliency_mbd
 from skimage.measure import label  
 from baseline_mode import Baseline
 from uNLC.src.nlc import nlc_videos
-
-
-#################################################################################
-#################################################################################
-# TODO: set RUN_NLC to false if you don't want to run NLC algorithm
-# TODO: set LOAD_NLC to false if you don't want to load the NLC output
-
-RUN_NLC = False
-
-LOAD_NLC = True
-
-#################################################################################
-#################################################################################
+import argparse
 
 
 def threshold(mask):
@@ -69,81 +57,118 @@ def getConsensus(masks):
     return getLargestCC(final)
     
 
+def parse():
+    """ 
+    Argument parser 
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--filename', '-f', help="Filename you put in video folder", required=True)
+    parser.add_argument('--prerunNLC', type=bool, default=False,
+                    help='Pre-run NLC algorithm')
+    parser.add_argument('--NLCon', type=bool, default=False,
+                    help='Run the whole program with NLC')
+    parser.add_argument('--NLCbatch', type=int, default=20,
+                    help='Batch frame size for NLC algorithm')               
+
+    args = parser.parse_args()
+
+    return args
+
+
+def runner():
+    args = parse()
+    filename = args.filename
+
+    if args.prerunNLC:
+
+        try:
+            nlc_videos(filename, load=False, batch_size=args.NLCbatch)
+        except np.core._exceptions.MemoryError:
+            print('''
+Error:
+Might need to run:
+    sudo su
+    echo 1 > /proc/sys/vm/overcommit_memory
+Otherwsie computer might not be able to collect enough memory for numpy array in compute_nn
+With the current batching size, the NLC algorithm is runnable on i7 Intel core.
+If you want to adjust the size of the batch, run the program with and set it with flag NLCbatch
+            ''')
+            return
+
+    else:  
+        mr = MR.MR_saliency()
+        cap = cv2.VideoCapture("../videos/" + filename)
+
+        ret, frame1 = cap.read()
+        prvs = cv2.resize(frame1, (420,240))
+
+        # initialize the baseline_mode method
+        BLM = Baseline(prvs)
+
+        frame_idx = 0
+
+    
+        
+        while True:
+            # current frame idx
+            frame_idx += 1
+
+            ret, frame = cap.read()
+            if not ret:
+                break
+            next = cv2.resize(frame, (420,240))
+            masks = []
+            ang, mag = getFlow(prvs, next)
+            masks.append(ang)
+            masks.append(mag)
+            #sal = mr.saliency(next)
+            pSMR = pySaliencyMapRunner.getSalMask(next)
+            masks.append(pSMR/255)
+            rbd = get_saliency_rbd(next).astype('uint8')
+            masks.append(threshold(rbd))
+            mbd = get_saliency_mbd(next).astype('uint8')
+            masks.append(threshold(mbd))
+
+            # output from baseline_mode 
+            bl = BLM.step(next)
+            masks.append(threshold(bl))
+
+            if args.NLCon:
+                # output from nlc algorithm, finished thresholding already
+                try:
+                    nlc = nlc_videos(filename, frame_idx, load=True)
+                except FileNotFoundError:
+                    print('''
+Error: You did not prerun the NLC algorithm, prerun the algorithm first and then run the whole runner.
+                    ''')
+                    return
+                masks.append(nlc)
+
+            final = getConsensus(masks)
+            print(final)
+            drawimg = next.copy()
+            mask = np.zeros_like(drawimg)
+            mask[:,:,0] = final.astype(np.float)*255
+            drawimg = cv2.add(drawimg, mask)
+
+
+            # show masked frames
+            cv2.imshow("mask", final.astype(np.float))
+            cv2.imshow("rbd", threshold(rbd))
+            cv2.imshow("img", drawimg)
+            cv2.imshow("mbd", threshold(mbd))
+            cv2.imshow("pSMR", pSMR)
+            cv2.imshow("bl", bl)
+
+            if args.NLCon:
+                cv2.imshow("nlc", nlc)
+
+            #cv2.imshow("MR", sal)
+            cv2.imshow("ang", ang)
+            cv2.imshow("mag", mag)
+            cv2.waitKey(1)
+            prvs = next
+
 
 if __name__ == "__main__":
-    filename = sys.argv[1]
-    mr = MR.MR_saliency()
-    cap = cv2.VideoCapture("../videos/" + filename)
-
-    ret, frame1 = cap.read()
-    prvs = cv2.resize(frame1, (420,240))
-
-    # initialize the baseline_mode method
-    BLM = Baseline(prvs)
-
-    frame_idx = 0
-
-    if RUN_NLC:
-        #############################################################################################
-        # Pre-run nlc algorithm
-        # Might need to run :
-        #       sudo su
-        #       echo 1 > /proc/sys/vm/overcommit_memory 
-        # otherwise computer might not be able to collect enough memory for numpy array in compute_nn
-        nlc_videos(filename, load=False)
-
-        #############################################################################################
-    
-    while True:
-        # current frame idx
-        frame_idx += 1
-
-        ret, frame = cap.read()
-        if not ret:
-            break
-        next = cv2.resize(frame, (420,240))
-        masks = []
-        ang, mag = getFlow(prvs, next)
-        masks.append(ang)
-        masks.append(mag)
-        #sal = mr.saliency(next)
-        pSMR = pySaliencyMapRunner.getSalMask(next)
-        masks.append(pSMR/255)
-        rbd = get_saliency_rbd(next).astype('uint8')
-        masks.append(threshold(rbd))
-        mbd = get_saliency_mbd(next).astype('uint8')
-        masks.append(threshold(mbd))
-
-        # output from baseline_mode 
-        bl = BLM.step(next)
-        masks.append(threshold(bl))
-
-        if LOAD_NLC:
-            # output from nlc algorithm, finished thresholding already
-            nlc = nlc_videos(filename, frame_idx, load=True)
-            masks.append(nlc)
-
-        final = getConsensus(masks)
-        print(final)
-        drawimg = next.copy()
-        mask = np.zeros_like(drawimg)
-        mask[:,:,0] = final.astype(np.float)*255
-        drawimg = cv2.add(drawimg, mask)
-
-
-        # show masked frames
-        cv2.imshow("mask", final.astype(np.float))
-        cv2.imshow("rbd", threshold(rbd))
-        cv2.imshow("img", drawimg)
-        cv2.imshow("mbd", threshold(mbd))
-        cv2.imshow("pSMR", pSMR)
-        cv2.imshow("bl", bl)
-
-        if LOAD_NLC:
-            cv2.imshow("nlc", nlc)
-
-        #cv2.imshow("MR", sal)
-        cv2.imshow("ang", ang)
-        cv2.imshow("mag", mag)
-        cv2.waitKey(1)
-        prvs = next
+    runner()

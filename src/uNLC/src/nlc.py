@@ -38,9 +38,10 @@ import pyflow
 import cv2
 
 
-VIDDIR = '/home/neo/video-segmentation/videos/'
+# With regard to runner.py
+VIDDIR = '../videos/'
 
-MASKDIR = '/home/neo/video-segmentation/src/uNLC/maskSeq/'
+MASKDIR = './uNLC/maskSeq/'
 
 FRAMEGAP = 0    # Gap between frames while running tracker. Default 0.
 
@@ -617,7 +618,7 @@ def nlc(imSeq, maxsp, iters, outdir=None, suffix='',
     return maskSeq
 
 
-def nlc_videos(filename, frame_idx=0, load=False):
+def nlc_videos(filename, frame_idx=0, load=False, batch_size=BATCH_FRAME):
     """
     Input is the path of directory containing raw videos
     """
@@ -652,7 +653,7 @@ def nlc_videos(filename, frame_idx=0, load=False):
 
         n, h, w, c = imSeq.shape
 
-        batch_num = math.ceil(n/BATCH_FRAME)
+        batch_num = math.ceil(n/batch_size)
 
         batches = np.array_split(imSeq, batch_num)
 
@@ -719,5 +720,8 @@ def nlc_videos(filename, frame_idx=0, load=False):
         return utils.invert(np.load('{}{}{}.npy'.format(MASKDIR, filename, frame_idx)))
 
 
-if __name__ == "__main__":
-    nlc = nlc_videos("bus.mp4", frame_idx = 0, load=False)
+# if __name__ == "__main__":
+#     Seq = []
+#     for i in range(80):
+#         nlc = nlc_videos("bus.mp4", frame_idx = i, load=True)
+#         Seq.append(nlc)
